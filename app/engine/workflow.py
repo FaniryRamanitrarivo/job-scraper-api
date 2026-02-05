@@ -1,30 +1,26 @@
-import time
+from app.engine.context import WorkflowContext
+from app.engine.dispatcher import STEP_HANDLERS
 import uuid
-from app.engine import steps
 
-def run_workflow(workflow: dict):
-    run_id = str(uuid.uuid4())
-    logs = []
-    results = {}
+def run_workflow(workflow, run_id=None):
+    run_id = run_id or str(uuid.uuid4())
+    ctx = WorkflowContext(run_id, dispatcher=STEP_HANDLERS)  # 🔹 dispatcher injecté
 
-    logs.append(f"[{run_id}] Starting workflow on {workflow.get('entry')}")
+    try:
+        for index, step in enumerate(workflow["steps"], start=1):
+            step_type = step["type"]
 
-    for step in workflow.get("steps", []):
-        step_type = step.get("type")
+            if step_type not in STEP_HANDLERS:
+                raise ValueError(f"Unknown step type: {step_type}")
 
-        try:
-            if step_type == "categories":
-                results["categories"] = steps.fetch_urls(step, run_id)
-            elif step_type == "listing":
-                results["listing"] = steps.fetch_urls(step, run_id)
-            elif step_type == "details":
-                results["details"] = steps.fetch_urls(step, run_id)
-            else:
-                logs.append(f"[{run_id}] Unknown step type: {step_type}")
-        except Exception as e:
-            logs.append(f"[{run_id}] Error in step {step_type}: {e}")
+            ctx.log(f"Step {index}: {step_type}")
+            STEP_HANDLERS[step_type](step, ctx)
 
-    logs.append(f"[{run_id}] Workflow finished")
+        return {
+            "run_id": run_id,
+            "data": ctx.data,
+            "logs": ctx.logs,
+        }
 
-    return run_id, logs, results
-        
+    finally:
+        ctx.close()
