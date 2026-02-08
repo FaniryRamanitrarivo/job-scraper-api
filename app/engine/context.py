@@ -1,16 +1,14 @@
-from app.browsers.selenium import SeleniumBrowser
+from app.browser.base import BaseBrowser
 from datetime import datetime
 
 class WorkflowContext:
-    def __init__(self, run_id, headless=True, dispatcher=None):
+    def __init__(self, run_id: str, browser: BaseBrowser):
         self.run_id = run_id
-        self.browser = SeleniumBrowser(headless=headless)
-        self.dispatcher = dispatcher
-
+        self.browser = browser
         self.data = {}
         self.logs = []
 
-    def log(self, message, level = "INFO"):
+    def log(self, message: str, level="INFO"):
         entry = {
             "run_id": self.run_id,
             "level": level,
