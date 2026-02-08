@@ -1,9 +1,14 @@
-class StepExecutor:
-    def __init__(self, dispatcher):
-        self.dispatcher = dispatcher
+from typing import Dict, Callable
+from app.engine.context import WorkflowContext
 
-    def execute(self, step, ctx):
-        step_type = step["type"]
-        if step_type not in self.dispatcher:
+class StepExecutor:
+    def __init__(self, handlers: Dict[str, Callable]):
+        self.handlers = handlers
+
+    def execute(self, step: dict, ctx: WorkflowContext):
+        step_type = step.get("type")
+        if step_type not in self.handlers:
             raise ValueError(f"Unknown step type: {step_type}")
-        self.dispatcher[step_type](step, ctx)
+
+        ctx.log(f"Executing step: {step_type}")
+        self.handlers[step_type](step, ctx)

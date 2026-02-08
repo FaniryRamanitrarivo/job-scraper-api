@@ -1,20 +1,13 @@
-def fetch_text(step, ctx):
-    """
-    Récupère le texte d'un élément et l'ajoute dans ctx.data.
-    Si la clé existe déjà, on append dans la liste pour ne pas écraser.
-    """
+# app/steps/fetch_text.py
+from app.engine.context import WorkflowContext
+
+def fetch_text(step: dict, ctx: WorkflowContext):
     selector = step["selector"]
-    save_as = step["save_as"]
+    field = step["save_as"]
 
-    ctx.log(f"Fetching text for selector {selector}")
+    text = ctx.browser.get_text(selector)
 
-    # Récupérer le texte via le navigateur
-    value = ctx.browser.get_text(selector)
-
-    # Stocker dans une liste pour accumuler tous les items
-    if save_as in ctx.data:
-        ctx.data[save_as].append(value)
+    if ctx.current_object is not None:
+        ctx.current_object[field] = text
     else:
-        ctx.data[save_as] = [value]
-
-    ctx.log(f"Saved text under '{save_as}': {value}")
+        ctx.data[field] = text
