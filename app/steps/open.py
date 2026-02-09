@@ -1,25 +1,32 @@
 import time
 from selenium.common.exceptions import TimeoutException, WebDriverException
 
-def open_page(step, ctx):
-    url = step.get("url") or ctx.data.get("item")
+
+def open_page(step: dict, ctx):
+    url = step.get("url") or ctx.current_item
     if not url:
-        raise ValueError("open step requires 'url' or item")
+        raise ValueError("open step requires 'url' or current item")
 
     max_retries = step.get("retries", 3)
-    base_delay = step.get("retry_delay", 2)  # seconds
+    base_delay = step.get("retry_delay", 2)
 
-    attempt = 0
-
-    while attempt <= max_retries:
+    for attempt in range(1, max_retries + 2):
         try:
-            ctx.log(f"Opening {url} (attempt {attempt + 1})")
+            ctx.log(f"Opening {url} (attempt {attempt})")
+
+            # ✅ on passe par TON wrapper
             ctx.browser.open(url)
-            return  # ✅ succès → on sort
 
-        except (TimeoutException, WebDriverException) as e:
-            attempt += 1
+            return  # succès
 
+        except TimeoutException:
+            ctx.log(
+                "Page load timeout ignored (DOM likely usable)",
+                level="WARNING",
+            )
+            return
+
+        except WebDriverException as e:
             if attempt > max_retries:
                 ctx.log(
                     f"Failed to open {url} after {max_retries} retries: {e}",

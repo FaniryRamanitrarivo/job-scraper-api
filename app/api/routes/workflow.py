@@ -12,7 +12,7 @@ runner = WorkflowRunner(executor, browser)
 
 @router.post("/execute")
 def execute_workflow(workflow: dict):
-    browser = SeleniumBrowser() 
+    browser = SeleniumBrowser(headless=False) 
     executor = StepExecutor(STEP_HANDLERS)
     runner = WorkflowRunner(executor, browser)
 

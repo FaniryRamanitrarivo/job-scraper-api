@@ -8,7 +8,11 @@ class SeleniumBrowser(BaseBrowser):
         options = Options()
         if self.headless:
             options.add_argument("--headless=new")
+        options.page_load_strategy = "eager"
+
         self.driver = webdriver.Chrome(options=options)
+        self.driver.set_page_load_timeout(15)
+
 
     def open(self, url: str):
         self.driver.get(url)
