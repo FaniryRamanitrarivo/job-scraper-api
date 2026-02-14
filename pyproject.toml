@@ -11,5 +11,6 @@ dependencies = [
   "python-dotenv",
   "loguru",
   "sqlalchemy",
-  "psycopg2-binary"
+  "psycopg2-binary",
+  "selenium"
 ]

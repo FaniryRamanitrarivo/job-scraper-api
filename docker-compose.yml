@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  job_scraper_api:
+    build: .
+    ports:
+      - "8000:8000"   # 🔥 IMPORTANT
+    environment:
+      - SELENIUM_URL=http://selenium_chrome:4444/wd/hub
+    depends_on:
+      selenium_chrome:
+        condition: service_healthy
+    restart: unless-stopped
+
+  selenium_chrome:
+    image: selenium/standalone-chrome:4   # ⚠️ évite latest
+    ports:
+      - "4444:4444"
+      - "7900:7900"
+    shm_size: 2gb
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
