@@ -1,7 +1,7 @@
 from app.engine.workflow_runner import WorkflowRunner
 from app.engine.step_executor import StepExecutor
 from app.steps.registry import STEP_HANDLERS
-from app.browser.selenium_browser import SeleniumBrowser
+from app.browsers.selenium_browser import SeleniumBrowser
 
 browser = SeleniumBrowser()
 executor = StepExecutor(STEP_HANDLERS)
