@@ -1,55 +1,41 @@
-from selenium import webdriver
+import time
+from loguru import logger
+
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import TimeoutException, WebDriverException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException, WebDriverException
-from loguru import logger
+
 from app.browsers.base_browser import BaseBrowser
-import time
-import os
+from app.core.selenium_pool import get_selenium_pool
+
 
 class SeleniumBrowser(BaseBrowser):
 
     def __init__(
         self,
         headless=True,
-        page_timeout=30,
+        page_timeout=20,
         element_timeout=15,
         retries=2
     ):
         self.page_timeout = page_timeout
         self.element_timeout = element_timeout
         self.retries = retries
+        self.headless = headless
 
-        chrome_options = Options()
-
-        if headless:
-            chrome_options.add_argument("--headless=new")
-
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        chrome_options.add_argument("--disable-gpu")
-        chrome_options.add_argument("--remote-allow-origins=*")
-
-
-        selenium_url = os.getenv(
-            "SELENIUM_URL",
-            "http://selenium_chrome:4444/wd/hub"
-        )
-
-        # self.driver = webdriver.Chrome(options=chrome_options)
-        self.driver = webdriver.Remote(
-            command_executor=selenium_url,
-            options=chrome_options
-        )
+        # Acquire driver from pool
+        pool = get_selenium_pool()
+        self.driver = pool.acquire()
         self.driver.set_page_load_timeout(self.page_timeout)
 
-        logger.info("Selenium browser started")
+        logger.info("Selenium browser acquired")
 
     # -------------------------
 
     def open(self, url):
+
+        last_exception = None
 
         for attempt in range(self.retries + 1):
 
@@ -58,17 +44,19 @@ class SeleniumBrowser(BaseBrowser):
                 self.driver.get(url)
                 return
 
-            except TimeoutException:
+            except TimeoutException as e:
                 logger.warning(f"Timeout loading {url}")
+                last_exception = e
 
             except WebDriverException as e:
                 logger.error(f"Driver error: {e}")
+                last_exception = e
 
             if attempt < self.retries:
                 logger.info("Retrying open...")
                 time.sleep(2)
-            else:
-                raise
+
+        raise last_exception
 
     # -------------------------
 
@@ -98,7 +86,6 @@ class SeleniumBrowser(BaseBrowser):
 
     # -------------------------
 
-# -------------------------
     def get_text(self, element):
         try:
             return element.text
@@ -113,12 +100,18 @@ class SeleniumBrowser(BaseBrowser):
             logger.error(f"Error getting attribute '{attr}': {e}")
             return None
 
+    # -------------------------
+
     def scroll_to_bottom(self):
         try:
-            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1)  # petite pause pour laisser le scroll se stabiliser
+            self.driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);"
+            )
+            time.sleep(1)
         except Exception as e:
             logger.error(f"Error scrolling to bottom: {e}")
+
+    # -------------------------
 
     def screenshot(self, name="error.png"):
         self.driver.save_screenshot(name)
@@ -127,5 +120,16 @@ class SeleniumBrowser(BaseBrowser):
     # -------------------------
 
     def quit(self):
-        logger.info("Closing Selenium browser")
-        self.driver.quit()
+        logger.info("Releasing Selenium browser")
+
+        try:
+            self.driver.delete_all_cookies()
+            self.driver.execute_script("window.localStorage.clear();")
+            self.driver.execute_script("window.sessionStorage.clear();")
+            self.driver.get("about:blank")
+        except Exception:
+            pass
+
+        pool = get_selenium_pool()
+        pool.release(self.driver)
+

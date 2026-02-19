@@ -1,16 +1,25 @@
-import re
-from loguru import logger
-
-
 class GenericScraper:
 
     def __init__(self, browser, payload, log):
         self.browser = browser
         self.payload = payload
-        self.products = set()
         self.log = log
+        self.visited = set()
 
-    def _extract(self, config):
+    # -------------------------
+
+    def open_once(self, url):
+
+        if url in self.visited:
+            return False
+
+        self.browser.open(url)
+        self.visited.add(url)
+        return True
+
+    # -------------------------
+
+    def extract(self, config):
 
         elements = self.browser.find_elements(config.selector)
 
@@ -18,15 +27,13 @@ class GenericScraper:
 
         for el in elements:
 
-            val = (
-                el.get_attribute(config.attribute)
-                if config.attribute else el.text
-            )
+            val = el.get_attribute(config.attribute) if config.attribute else el.text
 
             if not val:
                 continue
 
             if config.regex:
+                import re
                 m = re.search(config.regex, val)
                 if not m:
                     continue
@@ -34,74 +41,57 @@ class GenericScraper:
 
             results.append(val)
 
-        self.log.info(
-            "SCRAPER",
-            f"Extracted {len(results)} values"
-        )
-        
         return results
 
     # -------------------------
 
-    def scrape(self):
+    def paginate(self, base_url):
 
-        self.log.info(
-            "SCRAPER",
-            "Starting scraping"
-        )
+        yield base_url
 
-        for entry in self.payload.entry_points:
+        if not self.payload.pagination:
+            return
 
-            self.browser.open(entry)
+        if self.payload.pagination.type == "parameter_increment":
 
-            pages = [entry]
+            for i in range(2, self.payload.pagination.max_pages + 1):
 
-            # navigation
-            if self.payload.navigation:
-
-                for step in self.payload.navigation:
-
-                    self.log.info(
-                        "SCRAPER",
-                        f"Navigation step: {step.name}"
-                    )
-
-                    new_pages = []
-
-                    for page in pages:
-                        self.browser.open(page)
-                        new_pages.extend(self._extract(step.extract))
-
-                    pages = new_pages
-
-            # listing pages
-            for page in pages:
-
-                self.browser.open(page)
-
-                self.products.update(
-                    self._extract(self.payload.product_links)
+                yield base_url + self.payload.pagination.parameter.replace(
+                    "<PNum>", str(i)
                 )
 
-                # pagination parameter_increment
-                if self.payload.pagination \
-                   and self.payload.pagination.type == "parameter_increment":
+    # -------------------------
 
-                    for i in range(2, self.payload.pagination.max_pages + 1):
+    def scrape_entry(self, entry):
 
-                        url = page + self.payload.pagination.parameter.replace(
-                            "<PNum>", str(i)
-                        )
+        pages = [entry]
 
-                        self.browser.open(url)
+        # navigation
+        if self.payload.navigation:
 
-                        self.products.update(
-                            self._extract(self.payload.product_links)
-                        )
+            for step in self.payload.navigation:
 
-        self.log.info(
-            "SCRAPER",
-            f"Scraping finished: {len(self.products)} products"
-        )
+                new_pages = []
 
-        return list(self.products)
+                for page in pages:
+
+                    self.open_once(page)
+
+                    new_pages.extend(self.extract(step.extract))
+
+                pages = new_pages
+
+        # listing
+        products = set()
+
+        for page in pages:
+
+            for url in self.paginate(page):
+
+                self.open_once(url)
+
+                products.update(
+                    self.extract(self.payload.product_links)
+                )
+
+        return products

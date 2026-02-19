@@ -12,5 +12,7 @@ dependencies = [
   "loguru",
   "sqlalchemy",
   "psycopg2-binary",
-  "selenium"
+  "selenium",
+  "requests",
+  "lxml"
 ]

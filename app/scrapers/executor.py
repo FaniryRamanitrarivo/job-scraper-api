@@ -1,17 +1,26 @@
-from app.browsers.selenium_browser import SeleniumBrowser
-from app.models.scraping_payload import ScrapingPayload
-from app.scrapers.generic_scraper import GenericScraper
+from concurrent.futures import ThreadPoolExecutor
+from app.scrapers.generic_crawler import GenericCrawler
 from app.core.logger import Logger
 
-def run_scraping(payload: ScrapingPayload):
+def run_scraping(payload):
 
-    browser = SeleniumBrowser(headless=True)
     logger = Logger()
 
-    try:
-        scraper = GenericScraper(browser, payload, logger)
-        results = scraper.scrape()
-        return {"count": len(results), "products": results}
+    crawler = GenericCrawler(payload, logger)
 
-    finally:
-        browser.quit()
+    with ThreadPoolExecutor(max_workers=payload.workers or 4) as executor:
+
+        futures = [
+            executor.submit(crawler.crawl_entry, entry)
+            for entry in payload.entry_points
+        ]
+
+        results = set()
+
+        for f in futures:
+            results.update(f.result())
+
+    return {
+        "count": len(results),
+        "products": list(results)
+    }

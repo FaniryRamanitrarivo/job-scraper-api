@@ -9,21 +9,19 @@ services:
       selenium_chrome:
         condition: service_healthy
     restart: unless-stopped
-
     volumes:
-      - .:/app   # 🔥 IMPORTANT → live reload
-
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
+      - ./app:/app/app
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   selenium_chrome:
-    image: selenium/standalone-chrome:4
+    image: selenium/standalone-chrome:4.21.0
     ports:
       - "4444:4444"
       - "7900:7900"
     shm_size: 2gb
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4444/status"]
+      test: [ "CMD", "curl", "-f", "http://localhost:4444/status" ]
       interval: 5s
       timeout: 3s
       retries: 10
